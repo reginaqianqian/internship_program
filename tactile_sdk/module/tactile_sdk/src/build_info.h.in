@@ -1,0 +1,11 @@
+
+#pragma once
+
+namespace sharpa {
+namespace tactile {
+
+inline const char kVersion[] = "@VERSION_CONTENT@";
+inline const char kInstallDir[] = "@CMAKE_INSTALL_PREFIX@";
+
+}
+}

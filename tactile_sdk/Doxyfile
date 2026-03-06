@@ -1,0 +1,20 @@
+# Project metadata
+PROJECT_NAME           = "tactile_sdk API"
+PROJECT_NUMBER         = 1.1.4
+OUTPUT_DIRECTORY       = docs
+INPUT                  = module/tactile_sdk readme.md
+RECURSIVE              = NO
+USE_MDFILE_AS_MAINPAGE = readme.md
+
+# Output formats
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+
+# Code documentation options
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+# Source browsing
+SOURCE_BROWSER         = YES
+VERBATIM_HEADERS       = YES

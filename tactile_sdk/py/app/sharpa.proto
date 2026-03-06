@@ -1,0 +1,192 @@
+syntax = "proto3";
+// version 1.0324 alpha
+
+package proto;
+
+// ==================== Common Messages ====================
+message Stamp {
+    int32 sec = 1;
+    int32 nanosec = 2;
+}
+message Header {
+    Stamp stamp = 1;
+    string key = 2;
+    string frame_id = 3;
+    Stamp sys_time = 4;
+    uint32 seq = 5;
+}
+message Point {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+message Quaternion {
+    float w = 1;
+    float x = 2;
+    float y = 3;
+    float z = 4;
+}
+message Vector3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+}
+message Pose {
+    Point position = 1;
+    Quaternion orientation = 2;
+}
+message Wrench {
+    Vector3 force = 1;
+    Vector3 torque = 2;
+}
+message PoseStamped {
+    Header header = 1;
+    Pose pose = 2;
+}
+message Transform {
+    string frame = 1;  // T_cam_arm = arm in cam 
+    Pose pose = 2;
+}
+message WrenchStamped {
+    Header header = 1;
+    Wrench wrench = 2;
+}
+
+// ================= Observation Messages ================
+message CompressedImage {
+    Header header = 1;
+    string format = 2; // e.g., "jpeg"
+    bytes data = 3;    // Compressed image data
+}
+message Image {
+    Header header = 1;
+    int32 height = 2;
+    int32 width = 3;
+    string encoding = 4; // e.g., "rgb8"
+    bytes data = 5;      // Image data
+}
+message Deform {
+    int32 height = 1;
+    int32 width = 2;
+    bytes data = 3;
+}
+message VRImage {
+    Header header = 1;
+    CompressedImage image_right = 2;
+    CompressedImage image_left = 3;
+    CompressedImage fish_right = 4;
+    CompressedImage fish_left = 5;
+}
+
+// ================= State/Action Messages ==================
+message Joint {
+    repeated string name = 1;
+    repeated float position = 2;
+    repeated float velocity = 3;
+    repeated float effort = 4;
+}
+message Arm {
+    Header header = 1;
+    Pose cartesian = 2;
+    Joint joint = 3;
+    Wrench wrench = 4;
+    uint32 error_code = 5;
+}
+message Hand {
+    Header header = 1;
+    Joint joint = 2;
+}
+message Neck {
+    Header header = 1;
+    Joint joint = 2;
+}
+message Tactile {
+    Header header = 1;
+    Deform deform = 2;
+    Wrench force6d = 3;
+}
+message HandTactile {
+    Header header = 1;
+    Joint joint = 2;
+    repeated Tactile tactile = 3;
+    Pose tcp_pose = 4;
+}
+
+// ================ State/Action Bundle ==================
+message HandActionBundle {
+    repeated Hand gloves = 1;
+    bool direct_control = 2;
+}
+message HandStateBundle {
+    repeated HandTactile hands = 1;
+}
+message UhrActionBundle {
+    Hand left_glove = 1;
+    Hand right_glove = 2;
+    Arm left_arm = 3;
+    Arm right_arm = 4;
+    Neck neck = 5;
+}
+message UhrStateBundle {
+    Hand left_hand = 1;
+    Hand right_hand = 2;
+    repeated Tactile tactile = 3;
+    Arm left_arm = 4;
+    Arm right_arm = 5;
+    Neck neck = 6;
+    repeated Transform transforms = 7;
+}
+
+
+// ================= Running Mode Messages =================
+message GloveCalibration {
+    repeated Hand gestures = 1;
+}
+message Mode {
+    Header header = 1;
+    int32 operation_mode = 2; //
+    int32 state = 3;  // INIT, STANDBY, RUNNING
+    int32 sub_state = 4; // Enter, Leaving
+}
+message LbtoInfo {
+    Header header = 1;
+    Mode mode = 2;
+    int32 record_num = 3;
+    int32 monitor_status = 4; // Error, Normal
+    ArmInfo arm_info_right = 5;
+    ArmInfo arm_info_left = 6;
+}
+message ArmInfo {
+    Header header = 1;
+    int32 arm_state = 2;
+    repeated float arm_force = 3;
+}
+// ================ Interactive Messages ====================
+message Endpoint {
+    string IP = 1;
+    uint32 port = 2;
+}
+message Info {
+    Header header = 1;
+    string message = 2;
+}
+
+message Request {
+    string key = 1;
+    uint32 cmd = 2;
+    string sn = 3;
+    string message = 4;
+}
+message Response {
+    bool success = 1;
+    int32 data = 2;
+    string message = 3;
+}
+message SocketInfo {
+    Endpoint left_hand = 1;
+    Endpoint right_hand = 2;
+    Endpoint left_arm = 3;
+    Endpoint right_arm = 4;
+    repeated Endpoint left_tactile = 5;
+    repeated Endpoint right_tactile = 6;
+}

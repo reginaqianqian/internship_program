@@ -1,0 +1,148 @@
+pipeline {
+    agent {
+        docker {
+            image 'tactile_dev:latest'
+            args '-u root:root -v /mnt:/mnt -v /home/$USER/.ssh:/root/.ssh --network=host --gpus all --runtime=nvidia'
+            label 'qiyue'
+        }
+    }
+    environment {
+        SOURCE_BRANCH = "${env.gitlabSourceBranch}"
+        TARGET_BRANCH = "${env.gitlabTargetBranch}"
+        MERGE_STATE = "${env.gitlabMergeRequestState}"
+        WORK_SPACE = "${env.WORKSPACE}"
+    }
+    stages {
+        stage('Clone') {
+            when {
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps {
+                script {
+                    echo "[===================================] [source branch] ${SOURCE_BRANCH}"
+                    echo "[===================================] [target branch] ${TARGET_BRANCH}"
+                    echo "[===================================] [merge state] ${MERGE_STATE}"
+                    echo "[===================================] [work space] ${WORK_SPACE}"
+                    checkout scmGit(branches: [[name: '*/master']], extensions: [localBranch('$SOURCE_BRANCH'), lfs()], userRemoteConfigs: [[credentialsId: 'jenkins', url: 'ssh://git@code.hesaitech.com:10022/tactile-group/tactile_sdk.git']])
+                }
+            }
+        }
+
+        stage('Check Version') {
+            when {
+                environment name: 'MERGE_STATE', value: 'opened'
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps {
+                gitlabCommitStatus("Check Version") {
+                    script {
+                        def targetVersion = sh(
+                            script: '''
+                            git config --global --add safe.directory $WORK_SPACE
+                            git show remotes/origin/$TARGET_BRANCH:version
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        def sourceVersion = sh(
+                            script: '''
+                            git config --global --add safe.directory $WORK_SPACE
+                            git show remotes/origin/$SOURCE_BRANCH:version
+                            ''',
+                            returnStdout: true
+                        ).trim()
+                        echo "Source branch version: ${sourceVersion}"
+                        echo "Target branch version: ${targetVersion}"
+                        if (!isVersionIncreased(sourceVersion, targetVersion)) {
+                            error "Version check failed. source: (${sourceVersion}) target: (${targetVersion})"
+                        } else {
+                            echo "Version check passed."
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Lint') {
+            when {
+                environment name: 'MERGE_STATE', value: 'opened'
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps{
+                gitlabCommitStatus("Lint") {
+                    sh '''
+                    # linter to be added
+                    '''
+                }
+            }
+        }
+
+        stage('Build') {
+            when {
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps{
+                gitlabCommitStatus("Build") {
+                    sh '''
+                    cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TEST=ON -DBUILD_PY=ON -DINFER_ENGINE=cuda -GNinja
+                    cmake --build build
+                    pip install py/dist/tactile_sdk-$(cat version)-cp310-cp310-linux_x86_64.whl
+                    cpack --config build/CPackConfig.cmake
+                    dpkg -i tactile_sdk-$(cat version)-Linux.deb
+                    '''
+                }
+            }
+        }
+
+        stage('Test') {
+            when {
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps{
+                gitlabCommitStatus("Test") {
+                    sh '''
+                    ctest -V --test-dir build/module/tactile_sdk/
+                    python -m pytest test_py/ -v
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                environment name: 'MERGE_STATE', value: 'merged'
+                environment name: 'TARGET_BRANCH', value: 'master'
+            }
+            steps{
+                gitlabCommitStatus("Deploy") {
+                    sh '''
+                    twine upload -u . -p . --repository-url http://10.69.43.36:8081/ py/dist/tactile_sdk-$(cat version)-cp310-cp310-linux_x86_64.whl
+                    scp tactile_sdk-$(cat version)-Linux.deb 10.69.43.36:/home/qiyue/file_server/
+                    bash script/feishu_notify.sh
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Cleaning up workspace...'
+            cleanWs()
+        }
+    }
+}
+
+def isVersionIncreased(String source, String target) {
+    def sourceParts = source.tokenize('.').collect { it as int }
+    def targetParts = target.tokenize('.').collect { it as int }
+
+    // Compare each part of the version
+    for (int i = 0; i < Math.max(sourceParts.size(), targetParts.size()); i++) {
+        def sourcePart = i < sourceParts.size() ? sourceParts[i] : 0
+        def targetPart = i < targetParts.size() ? targetParts[i] : 0
+
+        if (sourcePart == targetPart + 1) return true
+        if (sourcePart < targetPart) return false
+    }
+    return false
+}

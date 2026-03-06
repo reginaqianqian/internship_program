@@ -1,0 +1,8 @@
+BasedOnStyle: Chromium
+IndentWidth: 4              # 关键：设置缩进为 4 个空格
+TabWidth: 4                 # tab 宽度也设为 4
+UseTab: Never               # 关键：不使用 tab，全部用空格
+
+ColumnLimit: 90            # 每行最大字符数（不要太小，避免过早换行,设为0表示不限制每行长度）
+IndentAccessModifiers: false # 访问修饰符本身也缩进（与成员变量缩进一致）
+AccessModifierOffset: -4     # 访问修饰符不偏移（与类边界对齐，缩进 4 空格）
